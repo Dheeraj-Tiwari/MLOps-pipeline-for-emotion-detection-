@@ -31,8 +31,24 @@ def load_model(model_path: str) -> object:
     except FileNotFoundError:
         logging.error(f"Model file not found at {model_path}.")
         raise
-    except Exception as e:
-        logging.error(f"Error loading model: {e}")
+
+def load_vectorizer(vectorizer_path: str) -> object:
+    """
+    Load a saved TfidfVectorizer from a file.
+
+    Args:
+        vectorizer_path (str): Path to the vectorizer file.
+
+    Returns:
+        object: Loaded TfidfVectorizer.
+    """
+    try:
+        with open(vectorizer_path, "rb") as file:
+            vectorizer = pickle.load(file)
+        logging.info(f"Vectorizer loaded successfully from {vectorizer_path}.")
+        return vectorizer
+    except FileNotFoundError:
+        logging.error(f"Vectorizer file not found at {vectorizer_path}.")
         raise
 
 def load_test_data(file_path: str) -> pd.DataFrame:
@@ -51,9 +67,6 @@ def load_test_data(file_path: str) -> pd.DataFrame:
         return data
     except FileNotFoundError:
         logging.error(f"Test data file not found at {file_path}.")
-        raise
-    except pd.errors.ParserError as e:
-        logging.error(f"Error parsing test data file: {e}")
         raise
 
 def evaluate_model(model: object, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, float]:
@@ -104,13 +117,18 @@ def main():
     Main function to execute the model evaluation pipeline.
     """
     try:
-        # Load model
+        # Load model and vectorizer
         model = load_model("models/random_forest_model.pkl")
+        vectorizer = load_vectorizer("models/tfidf_vectorizer.pkl")
 
         # Load test data
-        test_data = load_test_data("data/interim/test_bow.csv")
-        X_test = test_data.drop(columns=['label']).values
-        y_test = test_data['label'].values
+        test_data = load_test_data("data/interim/test_tfidf.csv")
+        X_test_raw = test_data.drop(columns=['sentiment']).values  # Drop the sentiment column to get TF-IDF features
+        y_test = test_data['sentiment'].values  # Extract labels
+
+        # Transform test data using the loaded vectorizer
+        # Ensure X_test_raw contains valid text data
+        X_test = vectorizer.transform([" ".join(map(str, row)) for row in X_test_raw])
 
         # Evaluate model
         metrics = evaluate_model(model, X_test, y_test)
